@@ -63,6 +63,20 @@ if uploaded_file is not None:
                     elif spot in scelta_2: 
                         costo_algoritmo -= 150
                         
+# 5. BONUS INTELLIGENZA GEOGRAFICA (Padova Centro vs Provincia)
+prov_utente = str(df.iloc[i].get("Da quale città/comune partirai", ""))
+mezzo_utente = str(df.iloc[i].get("Mezzo di trasporto", "Auto"))
+
+# Caso A: Chi è di Padova Centro e usa il treno -> Favoriamo Treviso, Venezia, Montebelluna
+if "Padova" in prov_utente and "Centro" in prov_utente:
+    if "Treno" in mezzo_utente and spot in ["TREVISO", "VENEZIA", "MONTEBELLUNA"]:
+        costo_algoritmo -= 200  # Mega-sconto! L'algoritmo capisce che è una tratta facilissima.
+
+# Caso B: Chi è della Provincia/Periferia e usa l'auto -> Favoriamo Cittadella, Noale, Castelfranco
+else:
+    # Se la residenza NON è in centro e l'utente ha l'auto
+    if "Auto" in mezzo_utente and spot in ["CITTADELLA", "NOALE", "CASTELFRANCO"]:
+        costo_algoritmo -= 150  # Forte sconto per evitare che chi ha l'auto finisca nel traffico per Treviso se può andare a Cittadella.
                     # ECCO IL LIMITE AGGIORNATO A 50 KM!
                     if dist > 50 and spot not in scelta_1 and spot not in scelta_2:
                         costo_algoritmo += 800 
