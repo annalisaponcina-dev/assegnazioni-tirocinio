@@ -7,9 +7,8 @@ import math
 
 st.set_page_config(page_title="Gestione Tirocini", page_icon="🏥", layout="wide")
 
-# --- PANNELLO DI CONTROLLO LATERALE ---
 st.sidebar.header("⚙️ Pannello Posti Disponibili")
-st.sidebar.markdown("Modifica i posti definitivi. Se sono meno degli studenti, il sistema creerà assegnazioni provvisorie eque.")
+st.sidebar.markdown("Modifica i posti definitivi.")
 
 sedi_lista = ["CASTELFRANCO", "MONTEBELLUNA", "SAN DONA' DI PIAVE", "NOALE", "TREVISO", "CITTADELLA", "VICENZA", "VENEZIA", "MESTRE", "CHIOGGIA"]
 default_posti = [4, 3, 2, 4, 10, 3, 2, 1, 1, 1] 
@@ -22,9 +21,8 @@ totale_posti = sum(capacities.values())
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Totale posti impostati:** {totale_posti}")
 
-# --- CORPO CENTRALE ---
 st.title("🏥 Assegnazione Automatica Sedi Tirocinio")
-st.markdown("Algoritmo intelligente con gestione automatica degli esuberi e distribuzione equa dei posti provvisori.")
+st.markdown("Algoritmo rigoroso: precedenza assoluta alla vicinanza (< 25 km). Le preferenze contano se non ci sono sedi vicine.")
 
 uploaded_file = st.file_uploader("Carica il file Excel scaricato da Google Forms", type=["xlsx"])
 
@@ -34,7 +32,6 @@ comodita_stazione = {
     "VICENZA": 2, "NOALE": 3, "CHIOGGIA": 5
 }
 
-# Distanze aggiornate con Dolo e Quarto d'Altino
 distanze_mappa = {
     "Monselice": {"CASTELFRANCO": 60, "MONTEBELLUNA": 70, "SAN DONA' DI PIAVE": 90, "NOALE": 55, "TREVISO": 70, "CITTADELLA": 55, "VICENZA": 50, "VENEZIA": 65, "MESTRE": 60, "CHIOGGIA": 45},
     "Mandria": {"CASTELFRANCO": 40, "MONTEBELLUNA": 55, "SAN DONA' DI PIAVE": 70, "NOALE": 35, "TREVISO": 55, "CITTADELLA": 35, "VICENZA": 40, "VENEZIA": 45, "MESTRE": 40, "CHIOGGIA": 45},
@@ -65,19 +62,16 @@ if uploaded_file is not None:
     
     st.success(f"File caricato! Trovati {studenti_totali} partecipanti.")
     
-    # AVVISO IN CASO DI ESUBERO
     if totale_posti < studenti_totali:
-        st.warning(f"⚠️ Ci sono {studenti_totali} studenti ma solo {totale_posti} posti ufficiali. Il sistema assegnerà i {studenti_totali - totale_posti} studenti in eccesso come 'Provvisori', distribuendoli nelle sedi migliori per non sovraffollare un solo ospedale.")
+        st.warning(f"⚠️ Ci sono {studenti_totali} studenti ma solo {totale_posti} posti ufficiali.")
     
     if st.button("Calcola Assegnazioni Ottimali"):
-        with st.spinner("Calcolo incrociato in corso..."):
+        with st.spinner("Calcolo basato su rigore chilometrico in corso..."):
             
-            # 1. Creazione dei posti ufficiali
             spots = []
             for loc, cap in capacities.items():
                 spots.extend([loc] * cap)
             
-            # 2. Creazione "Posti Fantasma" in caso di esubero (per distribuzione equa)
             if totale_posti < studenti_totali:
                 deficit = studenti_totali - totale_posti
                 extra_per_sede = max(1, math.ceil(deficit / len(capacities)))
@@ -101,15 +95,22 @@ if uploaded_file is not None:
                 
                 is_centro = "Padova Centro" in prov_utente
                 
+                # VERIFICA PREVENTIVA: Questo utente ha ALMENO UNA sede a meno di 25 km?
+                distanze_utente = distanze_mappa.get(prov_utente, {s: 50 for s in capacities.keys()})
+                ha_sede_vicina = any(d <= 25 for d in distanze_utente.values())
+                
                 for j, spot in enumerate(spots):
-                    dist = distanze_mappa.get(prov_utente, {}).get(spot, 50)
+                    dist = distanze_utente.get(spot, 50)
                     
-                    costo_algoritmo = (dist * 2 * 0.15) * 10
+                    # 1. Costo Base Chilometrico (fortemente ponderato)
+                    costo_algoritmo = (dist * 2 * 0.15) * 20 
                     
+                    # 2. Penalità Mezzi Pubblici
                     if "Treno" in mezzo_utente or "Autobus" in mezzo_utente:
                         moltiplicatore = 100 if "Scomoda" in stazione_casa else 50
                         costo_algoritmo += (comodita_stazione.get(spot, 0) * moltiplicatore)
                     
+                    # 3. Intelligenza Geografica Veneta
                     if is_centro and "Treno" in mezzo_utente:
                         if spot in ["TREVISO", "VENEZIA", "MONTEBELLUNA"]:
                             costo_algoritmo -= 200  
@@ -117,23 +118,39 @@ if uploaded_file is not None:
                         if spot in ["CITTADELLA", "NOALE", "CASTELFRANCO"]:
                             costo_algoritmo -= 150  
                     
-                    if spot == scelta_1: 
-                        costo_algoritmo -= 400
-                    elif spot == scelta_2: 
-                        costo_algoritmo -= 150
+                    # 4. REGOLA DELLE PREFERENZE CONDIZIONATE DALLA DISTANZA
+                    if ha_sede_vicina:
+                        # Se l'utente HA sedi vicine (<25 km), la preferenza vale SOLO SE la sede scelta è effettivamente vicina (<= 25km).
+                        # Se ha scelto una sede lontana, penalizziamo la scelta per dare priorità a chi abita lì vicino.
+                        if spot == scelta_1:
+                            if dist <= 25:
+                                costo_algoritmo -= 600  # Ottimo: vuole la sede vicino a casa ed è vicina
+                            else:
+                                costo_algoritmo += 300  # Penalità: ha sedi vicine ma vuole ostinarsi ad andare lontano
+                        elif spot == scelta_2:
+                            if dist <= 25:
+                                costo_algoritmo -= 300
+                            else:
+                                costo_algoritmo += 150
+                    else:
+                        # Se l'utente NON HA sedi vicine (<25 km), allora le sue preferenze vengono sbloccate pienamente!
+                        if spot == scelta_1:
+                            costo_algoritmo -= 800  # Sblocco totale preferenza perché è isolato geograficamente
+                        elif spot == scelta_2:
+                            costo_algoritmo -= 400
                         
+                    # 5. Bonus Carpooling
                     if carpooling != "nan" and carpooling != "" and spot == scelta_1:
-                        costo_algoritmo -= 100
+                        costo_algoritmo -= 200
                         
+                    # 6. Muro di Sicurezza 50 km (tranne se è l'unica opzione per chi non ha sedi vicine)
                     if dist > 50 and spot != scelta_1 and spot != scelta_2:
-                        costo_algoritmo += 1000 
+                        costo_algoritmo += 1500 
                         
                     cost_matrix[i, j] = costo_algoritmo
             
-            # 3. Motore di Assegnazione
             row_ind, col_ind = linear_sum_assignment(cost_matrix)
             
-            # 4. Conteggio e Gestione Stato (Confermato vs Provvisorio)
             posti_occupati = {loc: 0 for loc in capacities.keys()}
             risultati = []
             
@@ -141,7 +158,6 @@ if uploaded_file is not None:
                 assigned_spot = spots[col_ind[idx]]
                 posti_occupati[assigned_spot] += 1
                 
-                # Assegna etichetta in base alla capienza ufficiale
                 if posti_occupati[assigned_spot] <= capacities[assigned_spot]:
                     stato_assegnazione = "✅ Confermato"
                 else:
@@ -169,7 +185,7 @@ if uploaded_file is not None:
                 
             df_risultati = pd.DataFrame(risultati).sort_values(by=["Sede Assegnata", "Stato", "Nome"])
             
-            st.write("### 🏆 Assegnazioni Finali Calcolate")
+            st.write("### 🏆 Assegnazioni Finali Calcolate (Rigorose per Distanza)")
             st.dataframe(df_risultati, use_container_width=True)
             
             output = io.BytesIO()
@@ -179,6 +195,6 @@ if uploaded_file is not None:
             st.download_button(
                 label="📥 Scarica l'Excel Definitivo",
                 data=output.getvalue(),
-                file_name="Assegnazioni_Intelligenti_Tirocinio.xlsx",
+                file_name="Assegnazioni_Rigorose_Tirocinio.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
