@@ -21,11 +21,13 @@ totale_posti = sum(capacities.values())
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Totale posti impostati:** {totale_posti}")
 
+st.title("🏥 Assegnazione Automatica Sedi Tirocinio")
+
+# --- DESCRIZIONE AGGIUNTA ---
 st.markdown("""
-<div style='background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #0066cc;'>
-    <h3 style='margin: 0; color: #003366;'>🏥 Assegnazione Automatica Sedi Tirocinio</h3>
-    <p style='margin: 5px 0 0 0; color: #333333;'>
-        <b>Algoritmo rigoroso:</b> Precedenza assoluta alla vicinanza (&lt; 25 km). Le preferenze contano solo se non sono presenti sedi nei limitrofi.
+<div style='background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #0066cc; margin-bottom: 20px;'>
+    <p style='margin: 0; color: #333333; line-height: 1.5;'>
+        Questo programma è un sistema di smistamento automatizzato che, partendo dalle risposte di un modulo Google e dai posti disponibili nelle varie strutture, assegna i tirocini ospedalieri agli studenti bilanciando in modo rigoroso la vicinanza geografica reale (dando la precedenza assoluta a chi ha una sede a meno di 25 km), i vincoli di trasporto pubblico, il carpooling e le preferenze personali. L'algoritmo calcola il percorso ottimale per ogni studente e gestisce automaticamente eventuali esuberi distribuendo i posti provvisori in modo equo tra gli ospedali, generando infine una tabella Excel pronta per la segreteria.
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -101,22 +103,18 @@ if uploaded_file is not None:
                 
                 is_centro = "Padova Centro" in prov_utente
                 
-                # VERIFICA PREVENTIVA: Questo utente ha ALMENO UNA sede a meno di 25 km?
                 distanze_utente = distanze_mappa.get(prov_utente, {s: 50 for s in capacities.keys()})
                 ha_sede_vicina = any(d <= 25 for d in distanze_utente.values())
                 
                 for j, spot in enumerate(spots):
                     dist = distanze_utente.get(spot, 50)
                     
-                    # 1. Costo Base Chilometrico (fortemente ponderato)
                     costo_algoritmo = (dist * 2 * 0.15) * 20 
                     
-                    # 2. Penalità Mezzi Pubblici
                     if "Treno" in mezzo_utente or "Autobus" in mezzo_utente:
                         moltiplicatore = 100 if "Scomoda" in stazione_casa else 50
                         costo_algoritmo += (comodita_stazione.get(spot, 0) * moltiplicatore)
                     
-                    # 3. Intelligenza Geografica Veneta
                     if is_centro and "Treno" in mezzo_utente:
                         if spot in ["TREVISO", "VENEZIA", "MONTEBELLUNA"]:
                             costo_algoritmo -= 200  
@@ -124,32 +122,26 @@ if uploaded_file is not None:
                         if spot in ["CITTADELLA", "NOALE", "CASTELFRANCO"]:
                             costo_algoritmo -= 150  
                     
-                    # 4. REGOLA DELLE PREFERENZE CONDIZIONATE DALLA DISTANZA
                     if ha_sede_vicina:
-                        # Se l'utente HA sedi vicine (<25 km), la preferenza vale SOLO SE la sede scelta è effettivamente vicina (<= 25km).
-                        # Se ha scelto una sede lontana, penalizziamo la scelta per dare priorità a chi abita lì vicino.
                         if spot == scelta_1:
                             if dist <= 25:
-                                costo_algoritmo -= 600  # Ottimo: vuole la sede vicino a casa ed è vicina
+                                costo_algoritmo -= 600  
                             else:
-                                costo_algoritmo += 300  # Penalità: ha sedi vicine ma vuole ostinarsi ad andare lontano
+                                costo_algoritmo += 300  
                         elif spot == scelta_2:
                             if dist <= 25:
                                 costo_algoritmo -= 300
                             else:
                                 costo_algoritmo += 150
                     else:
-                        # Se l'utente NON HA sedi vicine (<25 km), allora le sue preferenze vengono sbloccate pienamente!
                         if spot == scelta_1:
-                            costo_algoritmo -= 800  # Sblocco totale preferenza perché è isolato geograficamente
+                            costo_algoritmo -= 800  
                         elif spot == scelta_2:
                             costo_algoritmo -= 400
                         
-                    # 5. Bonus Carpooling
                     if carpooling != "nan" and carpooling != "" and spot == scelta_1:
                         costo_algoritmo -= 200
                         
-                    # 6. Muro di Sicurezza 50 km (tranne se è l'unica opzione per chi non ha sedi vicine)
                     if dist > 50 and spot != scelta_1 and spot != scelta_2:
                         costo_algoritmo += 1500 
                         
@@ -191,7 +183,7 @@ if uploaded_file is not None:
                 
             df_risultati = pd.DataFrame(risultati).sort_values(by=["Sede Assegnata", "Stato", "Nome"])
             
-            st.write("### 🏆 Assegnazioni Finali Calcolate (Rigorose per Distanza)")
+            st.write("### 🏆 Assegnazioni Finali Calcolate")
             st.dataframe(df_risultati, use_container_width=True)
             
             output = io.BytesIO()
@@ -201,6 +193,6 @@ if uploaded_file is not None:
             st.download_button(
                 label="📥 Scarica l'Excel Definitivo",
                 data=output.getvalue(),
-                file_name="Assegnazioni_Rigorose_Tirocinio.xlsx",
+                file_name="Assegnazioni_Tirocinio.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
