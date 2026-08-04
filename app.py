@@ -21,8 +21,14 @@ totale_posti = sum(capacities.values())
 st.sidebar.markdown("---")
 st.sidebar.markdown(f"**Totale posti impostati:** {totale_posti}")
 
-st.title("🏥 Assegnazione Automatica Sedi Tirocinio")
-st.markdown("Algoritmo rigoroso: precedenza assoluta alla vicinanza (< 25 km). Le preferenze contano se non ci sono sedi vicine.")
+st.markdown("""
+<div style='background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #0066cc;'>
+    <h3 style='margin: 0; color: #003366;'>🏥 Assegnazione Automatica Sedi Tirocinio</h3>
+    <p style='margin: 5px 0 0 0; color: #333333;'>
+        <b>Algoritmo rigoroso:</b> Precedenza assoluta alla vicinanza (&lt; 25 km). Le preferenze contano solo se non sono presenti sedi nei limitrofi.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 uploaded_file = st.file_uploader("Carica il file Excel scaricato da Google Forms", type=["xlsx"])
 
