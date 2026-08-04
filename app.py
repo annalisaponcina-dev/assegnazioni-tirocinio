@@ -27,7 +27,7 @@ st.title("🏥 Assegnazione Automatica Sedi Tirocinio")
 st.markdown("""
 <div style='background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #0066cc; margin-bottom: 20px;'>
     <p style='margin: 0; color: #333333; line-height: 1.5;'>
-        Questo programma è un sistema di smistamento automatizzato che, partendo dalle risposte di un modulo Google e dai posti disponibili nelle varie strutture, assegna i tirocini ospedalieri agli studenti bilanciando in modo rigoroso la vicinanza geografica reale (dando la precedenza assoluta a chi ha una sede a meno di 25 km), i vincoli di trasporto pubblico, il carpooling e le preferenze personali. L'algoritmo calcola il percorso ottimale per ogni studente e gestisce automaticamente eventuali esuberi distribuendo i posti provvisori in modo equo tra gli ospedali, generando infine una tabella Excel pronta per la segreteria.
+        Questo programma è un sistema di smistamento automatizzato che, partendo dalle risposte di un modulo Google e dai posti disponibili nelle varie strutture, assegna i tirocini ospedalieri agli studenti bilanciando in modo rigoroso la vicinanza geografica reale, i vincoli di trasporto pubblico, il carpooling e le preferenze personali. L'algoritmo calcola il percorso ottimale per ogni studente e gestisce automaticamente eventuali esuberi distribuendo i posti provvisori in modo equo tra gli ospedali, generando infine una tabella Excel pronta per la segreteria.
     </p>
 </div>
 """, unsafe_allow_html=True)
