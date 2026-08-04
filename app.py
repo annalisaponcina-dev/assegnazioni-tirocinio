@@ -6,26 +6,35 @@ import io
 
 st.set_page_config(page_title="Gestione Tirocini", page_icon="🏥", layout="wide")
 
+# --- PANNELLO DI CONTROLLO LATERALE (SIDEBAR) ---
+st.sidebar.header("⚙️ Pannello Posti Disponibili")
+st.sidebar.markdown("Modifica qui i posti definitivi prima di calcolare.")
+
+sedi_lista = ["CASTELFRANCO", "MONTEBELLUNA", "SAN DONA' DI PIAVE", "NOALE", "TREVISO", "CITTADELLA", "VICENZA", "VENEZIA", "MESTRE", "CHIOGGIA"]
+default_posti = [4, 3, 2, 4, 10, 3, 2, 1, 1, 1] # Valori provvisori di partenza
+
+capacities = {}
+for sede, default in zip(sedi_lista, default_posti):
+    # Crea un contatore per ogni sede direttamente sul sito
+    capacities[sede] = st.sidebar.number_input(f"Posti a {sede}", min_value=0, max_value=50, value=default, step=1)
+
+totale_posti = sum(capacities.values())
+st.sidebar.markdown("---")
+st.sidebar.markdown(f"**Totale posti impostati:** {totale_posti}")
+
+# --- CORPO CENTRALE DEL SITO ---
 st.title("🏥 Assegnazione Automatica Sedi Tirocinio")
-st.markdown("Algoritmo intelligente: ottimizza in base a distanze esatte, carpooling, mezzi pubblici, comodità stazioni e intelligenza geografica.")
+st.markdown("Algoritmo intelligente: ottimizza in base a distanze esatte, carpooling, mezzi pubblici, preferenze e disponibilità reale.")
 
 uploaded_file = st.file_uploader("Carica il file Excel scaricato da Google Forms", type=["xlsx"])
 
-# 1. CAPIENZE SEDI (Totale 31 posti)
-capacities = {
-    "CASTELFRANCO": 4, "MONTEBELLUNA": 3, "SAN DONA' DI PIAVE": 2,
-    "NOALE": 4, "TREVISO": 10, "CITTADELLA": 3, "VICENZA": 2,
-    "VENEZIA": 1, "MESTRE": 1, "CHIOGGIA": 1
-}
-
-# 2. COMODITÀ STAZIONI (0 = Eccellente, 5 = Scomodissimo/Inesistente)
+# Comodità e Distanze restano invariate
 comodita_stazione = {
     "CITTADELLA": 0, "CASTELFRANCO": 0, "SAN DONA' DI PIAVE": 1, 
     "VENEZIA": 1, "TREVISO": 2, "MESTRE": 2, "MONTEBELLUNA": 2,
     "VICENZA": 2, "NOALE": 3, "CHIOGGIA": 5
 }
 
-# 3. DISTANZE ESATTE (in km) - Ricalibrate
 distanze_mappa = {
     "Monselice": {"CASTELFRANCO": 60, "MONTEBELLUNA": 70, "SAN DONA' DI PIAVE": 90, "NOALE": 55, "TREVISO": 70, "CITTADELLA": 55, "VICENZA": 50, "VENEZIA": 65, "MESTRE": 60, "CHIOGGIA": 45},
     "Mandria": {"CASTELFRANCO": 40, "MONTEBELLUNA": 55, "SAN DONA' DI PIAVE": 70, "NOALE": 35, "TREVISO": 55, "CITTADELLA": 35, "VICENZA": 40, "VENEZIA": 45, "MESTRE": 40, "CHIOGGIA": 45},
@@ -50,105 +59,105 @@ distanze_mappa = {
 
 if uploaded_file is not None:
     df = pd.read_excel(uploaded_file)
-    st.success(f"File caricato con successo! Analisi di {len(df)} partecipanti.")
+    studenti_totali = len(df)
     
-    if st.button("Calcola Assegnazioni Ottimali"):
-        with st.spinner("Incrocio di distanze, costi, trasporti e preferenze in corso..."):
-            
-            spots = []
-            for loc, cap in capacities.items():
-                spots.extend([loc] * cap)
+    st.success(f"File caricato! Trovati {studenti_totali} partecipanti.")
+    
+    # Controllo di Sicurezza sui Posti
+    if totale_posti < studenti_totali:
+        st.error(f"⚠️ ATTENZIONE: Hai {studenti_totali} studenti, ma solo {totale_posti} posti impostati nella barra laterale. Aumenta i posti disponibili prima di calcolare!")
+    else:
+        if st.button("Calcola Assegnazioni Ottimali"):
+            with st.spinner("Incrocio di distanze, costi, trasporti e preferenze in corso..."):
                 
-            n_people = len(df)
-            cost_matrix = np.zeros((n_people, len(spots)))
-            
-            for i in range(n_people):
-                nome = str(df.iloc[i, 0]).strip()
-                prov_utente = str(df.iloc[i, 1]).strip()
-                mezzo_utente = str(df.iloc[i, 2]).strip()
-                carpooling = str(df.iloc[i, 3]).strip()
-                scelta_1 = str(df.iloc[i, 4]).strip()
-                scelta_2 = str(df.iloc[i, 5]).strip()
+                spots = []
+                for loc, cap in capacities.items():
+                    spots.extend([loc] * cap)
+                    
+                n_people = len(df)
+                cost_matrix = np.zeros((n_people, len(spots)))
                 
-                # Identifica se è Padova Centro
-                is_centro = "Padova Centro" in prov_utente
-                
-                for j, spot in enumerate(spots):
-                    # Estrae la distanza, default 50km se la città non è in lista
-                    dist = distanze_mappa.get(prov_utente, {}).get(spot, 50)
+                for i in range(n_people):
+                    nome = str(df.iloc[i, 0]).strip()
+                    prov_utente = str(df.iloc[i, 1]).strip()
+                    mezzo_utente = str(df.iloc[i, 2]).strip()
+                    carpooling = str(df.iloc[i, 3]).strip()
+                    scelta_1 = str(df.iloc[i, 4]).strip()
+                    scelta_2 = str(df.iloc[i, 5]).strip()
                     
-                    # 1. Costo Base (Stima 0.15€/km moltiplicato per 10 per scala punteggio)
-                    costo_algoritmo = (dist * 2 * 0.15) * 10
+                    try:
+                        stazione_casa = str(df.iloc[i, 6]).strip()
+                    except IndexError:
+                        stazione_casa = "Media" 
                     
-                    # 2. Penalità Mezzi Pubblici
-                    if "Treno" in mezzo_utente or "Autobus" in mezzo_utente:
-                        costo_algoritmo += (comodita_stazione.get(spot, 0) * 50)
+                    is_centro = "Padova Centro" in prov_utente
                     
-                    # 3. Intelligenza Geografica Veneta
-                    if is_centro and "Treno" in mezzo_utente:
-                        if spot in ["TREVISO", "VENEZIA", "MONTEBELLUNA"]:
-                            costo_algoritmo -= 200  # Agevola collegamenti ferroviari diretti
-                    elif not is_centro and "Auto" in mezzo_utente:
-                        if spot in ["CITTADELLA", "NOALE", "CASTELFRANCO"]:
-                            costo_algoritmo -= 150  # Agevola statali, evita traffico hub grandi
-                    
-                    # 4. Sconti Preferenze
-                    if spot == scelta_1: 
-                        costo_algoritmo -= 400
-                    elif spot == scelta_2: 
-                        costo_algoritmo -= 150
+                    for j, spot in enumerate(spots):
+                        dist = distanze_mappa.get(prov_utente, {}).get(spot, 50)
                         
-                    # 5. Bonus Carpooling (se compila il campo e la sede è la sua 1ª scelta, forziamo l'assegnazione)
-                    if carpooling != "nan" and carpooling != "" and spot == scelta_1:
-                        costo_algoritmo -= 100
+                        costo_algoritmo = (dist * 2 * 0.15) * 10
                         
-                    # 6. Muro di Sicurezza 50 km (Eccezione: se scelta espressamente dall'utente)
-                    if dist > 50 and spot != scelta_1 and spot != scelta_2:
-                        costo_algoritmo += 1000 
+                        if "Treno" in mezzo_utente or "Autobus" in mezzo_utente:
+                            moltiplicatore = 100 if "Scomoda" in stazione_casa else 50
+                            costo_algoritmo += (comodita_stazione.get(spot, 0) * moltiplicatore)
                         
-                    cost_matrix[i, j] = costo_algoritmo
-            
-            # Motore di calcolo (Ricerca Operativa)
-            row_ind, col_ind = linear_sum_assignment(cost_matrix)
-            
-            risultati = []
-            for idx in range(n_people):
-                assigned_spot = spots[col_ind[idx]]
+                        if is_centro and "Treno" in mezzo_utente:
+                            if spot in ["TREVISO", "VENEZIA", "MONTEBELLUNA"]:
+                                costo_algoritmo -= 200  
+                        elif not is_centro and "Auto" in mezzo_utente:
+                            if spot in ["CITTADELLA", "NOALE", "CASTELFRANCO"]:
+                                costo_algoritmo -= 150  
+                        
+                        if spot == scelta_1: 
+                            costo_algoritmo -= 400
+                        elif spot == scelta_2: 
+                            costo_algoritmo -= 150
+                            
+                        if carpooling != "nan" and carpooling != "" and spot == scelta_1:
+                            costo_algoritmo -= 100
+                            
+                        if dist > 50 and spot != scelta_1 and spot != scelta_2:
+                            costo_algoritmo += 1000 
+                            
+                        cost_matrix[i, j] = costo_algoritmo
                 
-                # Valutazione Esito Finale
-                scelta_1 = str(df.iloc[idx, 4]).strip()
-                scelta_2 = str(df.iloc[idx, 5]).strip()
-                if assigned_spot == scelta_1: esito = "1ª Scelta"
-                elif assigned_spot == scelta_2: esito = "2ª Scelta"
-                else: esito = "Ottimizzazione Logistica / Adattamento"
+                row_ind, col_ind = linear_sum_assignment(cost_matrix)
                 
-                # Stima Distanza Effettiva
-                prov_utente = str(df.iloc[idx, 1]).strip()
-                dist_finale = distanze_mappa.get(prov_utente, {}).get(assigned_spot, 50)
-                costo_euro = round(dist_finale * 2 * 0.15, 2)
+                risultati = []
+                for idx in range(n_people):
+                    assigned_spot = spots[col_ind[idx]]
+                    
+                    scelta_1 = str(df.iloc[idx, 4]).strip()
+                    scelta_2 = str(df.iloc[idx, 5]).strip()
+                    if assigned_spot == scelta_1: esito = "1ª Scelta"
+                    elif assigned_spot == scelta_2: esito = "2ª Scelta"
+                    else: esito = "Adattamento Logistico"
+                    
+                    prov_utente = str(df.iloc[idx, 1]).strip()
+                    dist_finale = distanze_mappa.get(prov_utente, {}).get(assigned_spot, 50)
+                    costo_euro = round(dist_finale * 2 * 0.15, 2)
+                    
+                    risultati.append({
+                        "Nome": df.iloc[idx, 0], 
+                        "Sede Assegnata": f"Ospedale di {assigned_spot.title()}",
+                        "Esito": esito,
+                        "Distanza Stima": f"{dist_finale} km",
+                        "Costo Viaggio (A/R)": f"~ {costo_euro} €",
+                        "Stazione/Fermata": "Vicina/Comoda" if comodita_stazione.get(assigned_spot, 0) <= 1 else "Consigliata Auto"
+                    })
+                    
+                df_risultati = pd.DataFrame(risultati).sort_values(by=["Sede Assegnata", "Nome"])
                 
-                risultati.append({
-                    "Nome": df.iloc[idx, 0], 
-                    "Sede Assegnata": f"Ospedale di {assigned_spot.title()}",
-                    "Esito": esito,
-                    "Distanza Stima": f"{dist_finale} km",
-                    "Costo Viaggio Stimato (A/R)": f"~ {costo_euro} €",
-                    "Stazione/Fermata": "Ottima / Vicina" if comodita_stazione.get(assigned_spot, 0) <= 1 else "Consigliata Auto / Bus"
-                })
+                st.write("### 🏆 Assegnazioni Finali Calcolate")
+                st.dataframe(df_risultati, use_container_width=True)
                 
-            df_risultati = pd.DataFrame(risultati).sort_values(by=["Sede Assegnata", "Nome"])
-            
-            st.write("### 🏆 Assegnazioni Finali Calcolate")
-            st.dataframe(df_risultati, use_container_width=True)
-            
-            # Esportazione in Excel
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_risultati.to_excel(writer, index=False, sheet_name='Assegnazioni')
-            
-            st.download_button(
-                label="📥 Scarica l'Excel Definitivo",
-                data=output.getvalue(),
-                file_name="Assegnazioni_Intelligenti_Tirocinio.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                    df_risultati.to_excel(writer, index=False, sheet_name='Assegnazioni')
+                
+                st.download_button(
+                    label="📥 Scarica l'Excel Definitivo",
+                    data=output.getvalue(),
+                    file_name="Assegnazioni_Intelligenti_Tirocinio.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
